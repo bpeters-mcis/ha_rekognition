@@ -146,11 +146,11 @@ class ObjectDetection(SensorEntity):
         """
         Uploads the source file to the defined S3 bucket for processing, then deletes the local copy
         """
-        # Upload the file
         s3_client = client('s3', aws_access_key_id=self.aws_id, aws_secret_access_key=self.aws_key, region_name="us-east-2")
         try:
             s3_client.upload_file(self.input_file, self.bucket, "snapshot.png")
         except Exception as e:
+            _LOGGER.warning("Failed to upload file, got error: {}".format(e))
             os.remove(self.input_file)
             return False
         os.remove(self.input_file)
@@ -193,11 +193,8 @@ class ObjectDetection(SensorEntity):
         are found.
         :returns: True or False
         """
-        _LOGGER.warning("-- Looking for labels: {}".format(self.labels_to_find))
         for entry in labels:
-            _LOGGER.warning("-- Found label: {}".format(entry["Name"]))
             if entry["Name"] in self.labels_to_find:
-                _LOGGER.warning("--- Yes!")
                 return True
         return False
 
