@@ -8,6 +8,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 import logging
 import os
 from datetime import timedelta, datetime
+from PIL import Image, ImageDraw
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=5)
@@ -63,6 +64,7 @@ class ObjectDetection(SensorEntity):
         self._last_check_count_reset = datetime.now()
         self._next_check_count_reset = datetime.now() + timedelta(hours=hours_between_check_count_reset)
         self._hours_between_check_count_reset = hours_between_check_count_reset
+        self._image_path_with_boxes = self.input_file.split(".")[0] + "-boxes.png"
         self.bucket = bucket
         self.aws_id = aws_id
         self.aws_key = aws_key
@@ -151,7 +153,7 @@ class ObjectDetection(SensorEntity):
             s3_client.upload_file(self.input_file, self.bucket, "snapshot.png")
         except Exception as e:
             _LOGGER.warning("Failed to upload file, got error: {}".format(e))
-            os.remove(self.input_file)
+            os.rename(self.input_file, self._image_path_with_boxes)
             return False
         os.remove(self.input_file)
         return True
@@ -199,6 +201,29 @@ class ObjectDetection(SensorEntity):
         return False
 
 
+    def _draw_rectangles_on_image(self, label_results):
+        try:
+            source_img = Image.open(self._image_path_with_boxes)
+            source_width, source_height = source_img.size
+            draw = ImageDraw.Draw(source_img)
+
+            for label in label_results:
+                if label["Name"] in self.labels_to_find:
+                    for entry in label["Instances"]:
+                        x1 = entry["BoundingBox"]["Left"] * source_width
+                        y1 = entry["BoundingBox"]["Top"] * source_height
+                        x2 = x1 + (source_width * entry["BoundingBox"]["Width"])
+                        y2 = y1 + (source_height * entry["BoundingBox"]["Height"])
+
+                        draw.rectangle(((x1, y1), (x2, y2)), outline="red")
+                        text = "{}: {}%".format(label["Name"], entry["Confidence"])
+                        draw.text((x1 + 2, y1 - 10), text)
+
+            source_img.save(self._image_path_with_boxes, "PNG")
+        except:
+            pass
+
+
     def update(self) -> None:
         """Fetch new state data for the sensor.
         This is the only method that should fetch new data for Home Assistant.
@@ -225,6 +250,7 @@ class ObjectDetection(SensorEntity):
                 self._detections = self._get_detections(labels)
 
                 if self._is_label_found(labels):
+                    self._draw_rectangles_on_image(label_results=labels)
                     self._status = "Labels detected"
                     self._state = "on"
                 else:
