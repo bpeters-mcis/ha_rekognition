@@ -153,9 +153,9 @@ class ObjectDetection(SensorEntity):
             s3_client.upload_file(self.input_file, self.bucket, "snapshot.png")
         except Exception as e:
             _LOGGER.warning("Failed to upload file, got error: {}".format(e))
-            os.rename(self.input_file, self._image_path_with_boxes)
+            os.remove(self.input_file)
             return False
-        os.remove(self.input_file)
+        os.rename(self.input_file, self._image_path_with_boxes)
         return True
 
 
