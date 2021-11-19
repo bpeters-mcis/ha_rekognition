@@ -73,7 +73,9 @@ class ObjectDetection(SensorEntity):
         self.min_confidence = min_confidence
         self.max_allowed_checks = max_allowed_checks
         self.min_seconds_between_checks = min_seconds_between_checks
+        self.image_path_processing = self.input_file.split(".")[0] + "-processing.png"
         self.image_path_with_boxes = self.input_file.split(".")[0] + "-boxes.png"
+
 
 
     @property
@@ -155,7 +157,7 @@ class ObjectDetection(SensorEntity):
             _LOGGER.warning("Failed to upload file, got error: {}".format(e))
             os.remove(self.input_file)
             return False
-        os.rename(self.input_file, self.image_path_with_boxes)
+        os.rename(self.input_file, self.image_path_processing)
         return True
 
 
@@ -203,7 +205,7 @@ class ObjectDetection(SensorEntity):
 
     def _draw_rectangles_on_image(self, label_results):
         try:
-            source_img = Image.open(self.image_path_with_boxes)
+            source_img = Image.open(self.image_path_processing)
             source_width, source_height = source_img.size
             draw = ImageDraw.Draw(source_img)
 
