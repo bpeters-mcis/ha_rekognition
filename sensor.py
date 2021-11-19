@@ -155,7 +155,7 @@ class ObjectDetection(SensorEntity):
             _LOGGER.warning("Failed to upload file, got error: {}".format(e))
             os.remove(self.input_file)
             return False
-        os.rename(self.input_file, self._image_path_with_boxes)
+        os.rename(self.input_file, self.image_path_with_boxes)
         return True
 
 
