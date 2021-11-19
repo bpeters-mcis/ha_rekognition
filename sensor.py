@@ -64,7 +64,6 @@ class ObjectDetection(SensorEntity):
         self._last_check_count_reset = datetime.now()
         self._next_check_count_reset = datetime.now() + timedelta(hours=hours_between_check_count_reset)
         self._hours_between_check_count_reset = hours_between_check_count_reset
-        self._image_path_with_boxes = self.input_file.split(".")[0] + "-boxes.png"
         self.bucket = bucket
         self.aws_id = aws_id
         self.aws_key = aws_key
@@ -74,6 +73,7 @@ class ObjectDetection(SensorEntity):
         self.min_confidence = min_confidence
         self.max_allowed_checks = max_allowed_checks
         self.min_seconds_between_checks = min_seconds_between_checks
+        self.image_path_with_boxes = self.input_file.split(".")[0] + "-boxes.png"
 
 
     @property
@@ -203,7 +203,7 @@ class ObjectDetection(SensorEntity):
 
     def _draw_rectangles_on_image(self, label_results):
         try:
-            source_img = Image.open(self._image_path_with_boxes)
+            source_img = Image.open(self.image_path_with_boxes)
             source_width, source_height = source_img.size
             draw = ImageDraw.Draw(source_img)
 
@@ -219,7 +219,7 @@ class ObjectDetection(SensorEntity):
                         text = "{}: {}%".format(label["Name"], entry["Confidence"])
                         draw.text((x1 + 2, y1 - 10), text)
 
-            source_img.save(self._image_path_with_boxes, "PNG")
+            source_img.save(self.image_path_with_boxes, "PNG")
         except:
             pass
 
