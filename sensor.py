@@ -8,7 +8,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 import logging
 import os
 from datetime import timedelta, datetime
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=5)
@@ -37,6 +37,11 @@ def setup_platform(
     max_allowed_checks = config.get('max_allowed_checks', 1000)
     min_seconds_between_checks = config.get('min_seconds_between_checks', 60)
     hours_between_check_count_reset = config.get('hours_between_check_count_reset', 24)
+    detection_box_width = config.get('detection_box_width', 2)
+    detection_box_color = config.get('detection_box_color', "Red")
+    detection_box_font_size = config.get('detection_box_font_size', 25)
+    detection_box_stroke_width = config.get('detection_box_stroke_width', 1)
+    detection_box_stroke_color = config.get('detection_box_stroke_color', detection_box_color)
 
     add_entities([ObjectDetection(bucket=bucket,
                                   aws_id=aws_id,
@@ -47,14 +52,21 @@ def setup_platform(
                                   min_confidence=min_confidence,
                                   max_allowed_checks=max_allowed_checks,
                                   min_seconds_between_checks=min_seconds_between_checks,
-                                  hours_between_check_count_reset=hours_between_check_count_reset)])
+                                  hours_between_check_count_reset=hours_between_check_count_reset,
+                                  detection_box_width=detection_box_width,
+                                  detection_box_color=detection_box_color,
+                                  detection_box_font_size=detection_box_font_size,
+                                  detection_box_stroke_width=detection_box_stroke_width,
+                                  detection_box_stroke_color=detection_box_stroke_color)])
 
 
 class ObjectDetection(SensorEntity):
     """Representation of a Sensor."""
 
     def __init__(self, bucket, aws_id, aws_key, input_file, image_max_age, labels_to_find,
-                 min_confidence, max_allowed_checks, min_seconds_between_checks, hours_between_check_count_reset):
+                 min_confidence, max_allowed_checks, min_seconds_between_checks, hours_between_check_count_reset,
+                 detection_box_width, detection_box_color, detection_box_font_size,
+                 detection_box_stroke_width, detection_box_stroke_color):
         """Initialize the sensor."""
         self._state = "off"
         self._status = "None"
@@ -64,6 +76,11 @@ class ObjectDetection(SensorEntity):
         self._last_check_count_reset = datetime.now()
         self._next_check_count_reset = datetime.now() + timedelta(hours=hours_between_check_count_reset)
         self._hours_between_check_count_reset = hours_between_check_count_reset
+        self._detection_box_width = detection_box_width
+        self._detection_box_color = detection_box_color
+        self._detection_box_font_size = detection_box_font_size
+        self._detection_box_stroke_width = detection_box_stroke_width
+        self._detection_box_stroke_color = detection_box_stroke_color
         self.bucket = bucket
         self.aws_id = aws_id
         self.aws_key = aws_key
@@ -207,6 +224,7 @@ class ObjectDetection(SensorEntity):
         try:
             source_img = Image.open(self.image_path_processing)
             source_width, source_height = source_img.size
+            font = ImageFont.truetype("arial.ttf", self._detection_box_font_size)
             draw = ImageDraw.Draw(source_img)
 
             for label in label_results:
@@ -217,9 +235,13 @@ class ObjectDetection(SensorEntity):
                         x2 = x1 + (source_width * entry["BoundingBox"]["Width"])
                         y2 = y1 + (source_height * entry["BoundingBox"]["Height"])
 
-                        draw.rectangle(((x1, y1), (x2, y2)), outline="red")
+                        draw.rectangle(((x1, y1), (x2, y2)),
+                                       width=self._detection_box_width,
+                                       outline=self._detection_box_color)
                         text = "{}: {}%".format(label["Name"], entry["Confidence"])
-                        draw.text((x1 + 2, y1 - 10), text)
+                        draw.text((x1 + 2, y1 - 10), text, self._detection_box_color,
+                                  font=font, stroke_width=self._detection_box_stroke_width,
+                                  stroke_fill=self._detection_box_stroke_color)
 
             source_img.save(self.image_path_with_boxes, "PNG")
         except:
