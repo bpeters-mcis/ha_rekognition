@@ -224,7 +224,7 @@ class ObjectDetection(SensorEntity):
         try:
             source_img = Image.open(self.image_path_processing)
             source_width, source_height = source_img.size
-            font = ImageFont.truetype("arial.ttf", self._detection_box_font_size)
+            font = ImageFont.truetype("./Arial.ttf", self._detection_box_font_size)
             draw = ImageDraw.Draw(source_img)
 
             for label in label_results:
