@@ -297,8 +297,8 @@ class ObjectDetection(SensorEntity):
 
             output_path = "{}/combined_output.png".format(self._source_image_combine_path)
             new_im.save(output_path)
-        except:
-            pass
+        except Exception as e:
+            _LOGGER.warning("Could not save combined image, got error: {}".format(e))
 
 
     def update(self) -> None:
@@ -328,15 +328,17 @@ class ObjectDetection(SensorEntity):
 
                 if self._is_label_found(labels):
                     self._draw_rectangles_on_image(label_results=labels)
+                    self._combine_images()
                     self._status = "Labels detected"
                     self._state = "on"
                 else:
+                    self._combine_images()
                     self._status = "No relevant labels detected"
                     self._state = "off"
 
-                self._combine_images()
 
             else:
+                self._combine_images()
                 self._status = "File upload failed"
                 self._detections = {}
                 self._state = "off"
