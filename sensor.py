@@ -46,6 +46,7 @@ def setup_platform(
     source_image_combine_filename = config.get('source_image_combine_filename', 'motion')
     source_image_combine_number = config.get('source_image_combine_number', 2)
     source_image_combine_arrangement = config.get('source_image_combine_arrangement', 'vertical')
+    combined_image_resize_percent = config.get('combined_image_resize_percent', 100)
 
     add_entities([ObjectDetection(bucket=bucket,
                                   aws_id=aws_id,
@@ -65,7 +66,8 @@ def setup_platform(
                                   source_image_combine_path=source_image_combine_path,
                                   source_image_combine_filename=source_image_combine_filename,
                                   source_image_combine_number=source_image_combine_number,
-                                  source_image_combine_arrangement=source_image_combine_arrangement)])
+                                  source_image_combine_arrangement=source_image_combine_arrangement,
+                                  combined_image_resize_percent=combined_image_resize_percent)])
 
 
 class ObjectDetection(SensorEntity):
@@ -75,7 +77,8 @@ class ObjectDetection(SensorEntity):
                  min_confidence, max_allowed_checks, min_seconds_between_checks, hours_between_check_count_reset,
                  detection_box_width, detection_box_color, detection_box_font_size,
                  detection_box_stroke_width, detection_box_stroke_color, source_image_combine_path,
-                 source_image_combine_filename, source_image_combine_number, source_image_combine_arrangement):
+                 source_image_combine_filename, source_image_combine_number, source_image_combine_arrangement,
+                 combined_image_resize_percent):
         """Initialize the sensor."""
         self._state = "off"
         self._status = "None"
@@ -94,6 +97,7 @@ class ObjectDetection(SensorEntity):
         self._source_image_combine_filename = source_image_combine_filename
         self._source_image_combine_number = source_image_combine_number
         self._source_image_combine_arrangement = source_image_combine_arrangement
+        self._combined_image_resize_percent = combined_image_resize_percent
         self.bucket = bucket
         self.aws_id = aws_id
         self.aws_key = aws_key
@@ -264,6 +268,7 @@ class ObjectDetection(SensorEntity):
 
     def _combine_images(self):
         try:
+            _LOGGER.warning("trying to combine imges...")
             image_number = 1
             source_images = []
             while image_number <= self._source_image_combine_number:
@@ -280,13 +285,16 @@ class ObjectDetection(SensorEntity):
             max_width = max(widths)
             total_width = sum(widths)
 
+            _LOGGER.warning("-- Got w: {}, h: {}".format(max_width, max_height))
             if self._source_image_combine_arrangement == "horizontal":
+                _LOGGER.warning("--- Making horiz image")
                 new_im = Image.new('RGB', (total_width, max_height))
                 x_offset = 0
                 for im in images:
                     new_im.paste(im, (x_offset, 0))
                     x_offset += im.size[0]
             elif self._source_image_combine_arrangement == "vertical":
+                _LOGGER.warning("--- Making vert image")
                 new_im = Image.new('RGB', (max_width, total_height))
                 y_offset = 0
                 for im in images:
@@ -296,7 +304,14 @@ class ObjectDetection(SensorEntity):
                 return
 
             output_path = "{}/combined_output.png".format(self._source_image_combine_path)
+
+            resize_height = int((float(new_im.size[1])*float(self._combined_image_resize_percent / 100)))
+            resize_width = int((float(new_im.size[0])*float(self._combined_image_resize_percent) / 100))
+
+            _LOGGER.warning("---- Resize to: {} x {}".format(resize_width, resize_height))
+            new_im = new_im.resize((resize_width, resize_height), Image.ANTIALIAS)
             new_im.save(output_path)
+            _LOGGER.warning("------ Saved to {}".format(output_path))
         except Exception as e:
             _LOGGER.warning("Could not save combined image, got error: {}".format(e))
 
