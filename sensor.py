@@ -42,6 +42,10 @@ def setup_platform(
     detection_box_font_size = config.get('detection_box_font_size', 25)
     detection_box_stroke_width = config.get('detection_box_stroke_width', 1)
     detection_box_stroke_color = config.get('detection_box_stroke_color', detection_box_color)
+    source_image_combine_path = config.get('source_image_combine_path', '/config/www/')
+    source_image_combine_filename = config.get('source_image_combine_filename', 'motion')
+    source_image_combine_number = config.get('source_image_combine_number', 2)
+    source_image_combine_arrangement = config.get('source_image_combine_arrangement', 'vertical')
 
     add_entities([ObjectDetection(bucket=bucket,
                                   aws_id=aws_id,
@@ -57,7 +61,11 @@ def setup_platform(
                                   detection_box_color=detection_box_color,
                                   detection_box_font_size=detection_box_font_size,
                                   detection_box_stroke_width=detection_box_stroke_width,
-                                  detection_box_stroke_color=detection_box_stroke_color)])
+                                  detection_box_stroke_color=detection_box_stroke_color,
+                                  source_image_combine_path=source_image_combine_path,
+                                  source_image_combine_filename=source_image_combine_filename,
+                                  source_image_combine_number=source_image_combine_number,
+                                  source_image_combine_arrangement=source_image_combine_arrangement)])
 
 
 class ObjectDetection(SensorEntity):
@@ -66,7 +74,8 @@ class ObjectDetection(SensorEntity):
     def __init__(self, bucket, aws_id, aws_key, input_file, image_max_age, labels_to_find,
                  min_confidence, max_allowed_checks, min_seconds_between_checks, hours_between_check_count_reset,
                  detection_box_width, detection_box_color, detection_box_font_size,
-                 detection_box_stroke_width, detection_box_stroke_color):
+                 detection_box_stroke_width, detection_box_stroke_color, source_image_combine_path,
+                 source_image_combine_filename, source_image_combine_number, source_image_combine_arrangement):
         """Initialize the sensor."""
         self._state = "off"
         self._status = "None"
@@ -81,6 +90,10 @@ class ObjectDetection(SensorEntity):
         self._detection_box_font_size = detection_box_font_size
         self._detection_box_stroke_width = detection_box_stroke_width
         self._detection_box_stroke_color = detection_box_stroke_color
+        self._source_image_combine_path = source_image_combine_path
+        self._source_image_combine_filename = source_image_combine_filename
+        self._source_image_combine_number = source_image_combine_number
+        self._source_image_combine_arrangement = source_image_combine_arrangement
         self.bucket = bucket
         self.aws_id = aws_id
         self.aws_key = aws_key
@@ -249,6 +262,45 @@ class ObjectDetection(SensorEntity):
             pass
 
 
+    def _combine_images(self):
+        try:
+            image_number = 1
+            source_images = []
+            while image_number <= self._source_image_combine_number:
+                source_images.append("{}/{}-{}.png".format(self._source_image_combine_path,
+                                                           self._source_image_combine_filename,
+                                                           image_number))
+                image_number += 1
+
+            images = [Image.open(x) for x in source_images]
+            widths, heights = zip(*(i.size for i in images))
+
+            max_height = max(heights)
+            total_height = sum(heights)
+            max_width = max(widths)
+            total_width = sum(widths)
+
+            if self._source_image_combine_arrangement == "horizontal":
+                new_im = Image.new('RGB', (total_width, max_height))
+                x_offset = 0
+                for im in images:
+                    new_im.paste(im, (x_offset, 0))
+                    x_offset += im.size[0]
+            elif self._source_image_combine_arrangement == "vertical":
+                new_im = Image.new('RGB', (max_width, total_height))
+                y_offset = 0
+                for im in images:
+                    new_im.paste(im, (0, y_offset))
+                    y_offset += im.size[1]
+            else:
+                return
+
+            output_path = "{}/combined_output.png".format(self._source_image_combine_path)
+            new_im.save(output_path)
+        except:
+            pass
+
+
     def update(self) -> None:
         """Fetch new state data for the sensor.
         This is the only method that should fetch new data for Home Assistant.
@@ -281,6 +333,8 @@ class ObjectDetection(SensorEntity):
                 else:
                     self._status = "No relevant labels detected"
                     self._state = "off"
+
+                self._combine_images()
 
             else:
                 self._status = "File upload failed"
